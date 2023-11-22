@@ -1,0 +1,343 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <title>Roleta de Nomes</title>
+  </head>
+  <body>
+    <div>
+      <header>
+        <h1>Roleta de Nomes</h1>
+      </header>
+      <section>
+        <div id='roleta' >
+          <canvas id='tela' width='1000' height='600'></canvas>
+        </div>
+        <div id='nomes'>
+          <ul/>
+        </div>
+      </section>
+      <footer>
+        <p>Versao 0.1 =)</a></p>
+      </footer>
+    </div>
+    <script
+      src='https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min.js'
+      crossorigin='anonymous'></script>
+    <script
+      src='https://cdnjs.cloudflare.com/ajax/libs/tinysort/2.3.6/tinysort.min.js'
+      crossorigin='anonymous'></script>
+    <script
+      src='https://cdnjs.cloudflare.com/ajax/libs/tinysort/2.3.6/jquery.tinysort.min.js'
+      crossorigin='anonymous'></script>
+    <script>
+      var nomes = [
+  {nome: 'Chiquinho'},
+  {nome: 'Gabiru'},
+  {nome: 'Zé'},
+  {nome: 'jao Morrendo das Dores'},
+  {nome: 'Silverino da cunha'},
+  {nome: 'Araci'},
+  {nome: 'Asfilófio De Oliveira'},
+  {nome: 'Belderagas Piruégas'},
+  {nome: 'Confessoura Dornelles'},
+  {nome: 'Evangivaldo'},
+  {nome: 'Finólila'},
+  {nome: 'Holofontina Fufucas'},
+  {nome: 'juca Buscatel Canhão'},
+  {nome: 'Naida Navinda Navolta'},
+  {nome: 'Pauderney Avelino'}
+];
+
+var shuffle = function (o) {
+  for (var j, x, i = o.length; i; j = parseInt(Math.random() * i), x = o[--i], o[i] = o[j], o[j] = x);
+  return o;
+};
+
+var hashCode = function (string) {
+  var hash = 5381;
+  for (i = 0; i < string.length; i++) {
+    var char = string.charCodeAt(i);
+    hash = ((hash << 5) + hash) + char;
+    hash = hash & hash; // Conversao para inteiro de 32 bits
+  }
+  return hash;
+};
+
+var mod = function (a, b) {
+  return ((a % b) + b) % b;
+};
+
+$(function () {
+  var nomeContainer = $('#nomes ul');
+  nomes.forEach(function (pessoa) {
+    var nome = pessoa.nome;
+    nomeContainer.append(
+      $(document.createElement('li')).append(
+        $(document.createElement('input')).attr({
+          id: 'pessoa-' + nome,
+          nome: nome,
+          value: nome,
+          type: 'checkbox',
+          checked: true
+        }).change(function () {
+          var caixa = $(this)[0];
+          var segmentos = roleta.segmentos;
+          var i = segmentos.indexOf(caixa.value);
+
+          if (caixa.checked && i == -1) {
+            segmentos.push(caixa.value);
+
+          } else if (!caixa.checked && i != -1) {
+            segmentos.splice(i, 1);
+          }
+
+          segmentos.sort();
+          roleta.atualizar();
+        })
+      ).append(
+        $(document.createElement('label')).attr({
+          'for': 'pessoa-' + nome
+        }).text(nome)));
+  });
+
+  $('#nomes ul>li').tsort('input', {
+    attr: 'value'
+  });
+
+  var segmentos = [];
+  $.each($('#nomes input:checked'), function (key, caixa) {
+    segmentos.push(caixa.value);
+  });
+
+  roleta.segmentos = segmentos;
+  roleta.Iniciar();
+  roleta.atualizar();
+
+});
+
+var roleta = {
+  anguloAtual: 0,
+  anguloDelta: 0,
+  Tela: null,
+  centroX: 300,
+  centroY: 300,
+  CacheDeCores: [],
+  TempoDeParada: 4000,
+  frames: 0,
+  velocidadeMaxima: Math.PI / 16,
+  segmentos: [],
+  tamanho: 290,
+  InicioDoGiro: 0,
+  AtrasoDoTimer: 33,
+  ManipuladorDoTimer: 0,
+  TempoDeInicio: 1000,
+
+  Girar: function () {
+    // inicia a roda apenas se ainda nao estiver girando
+    if (roleta.ManipuladorDoTimer == 0) {
+      roleta.InicioDoGiro = new Date().getTime();
+      roleta.velocidadeMaxima = Math.PI / (16 + (Math.random() * 10)); // aleatoriza a velocidade da roda
+      roleta.frames = 0;
+      roleta.ManipuladorDoTimer = setInterval(roleta.ativarCronometro, roleta.AtrasoDoTimer);
+    }
+  },
+
+  ativarCronometro: function () {
+    roleta.frames++;
+    roleta.desenhar();
+
+    var duracao = (new Date().getTime() - roleta.InicioDoGiro);
+    var progresso = 0;
+    var finalizado = false;
+
+    if (duracao < roleta.TempoDeInicio) {
+      progresso = duracao / roleta.TempoDeInicio;
+      roleta.anguloDelta = roleta.velocidadeMaxima * Math.sin(progresso * Math.PI / 2);
+    } else {
+      progresso = duracao / roleta.TempoDeParada;
+      roleta.anguloDelta = roleta.velocidadeMaxima * Math.sin(progresso * Math.PI / 2 + Math.PI / 2);
+      if (progresso >= 1) {
+        finalizado = true;
+      }
+    }
+
+    roleta.anguloAtual += roleta.anguloDelta;
+    while (roleta.anguloAtual >= Math.PI * 2)
+      // controle do intervalo de angulo da roleta
+      roleta.anguloAtual -= Math.PI * 2;
+
+    if (finalizado) {
+      clearInterval(roleta.ManipuladorDoTimer);
+      roleta.ManipuladorDoTimer = 0;
+      roleta.anguloDelta = 0;
+
+      $('#counter').html((roleta.frames / duracao * 1000) + ' FPS');
+    }
+     
+  },
+
+  Iniciar: function (optionList) {
+    try {
+      roleta.IniciarRoleta();
+      roleta.IniciarTela();
+      roleta.desenhar();
+      $.extend(roleta, optionList);
+    } catch (exceptionData) {
+      alert('a roleta nao esta carregada ' + exceptionData);
+    }
+  },
+
+  IniciarTela: function () {
+    var tela = $('#roleta #tela').get(0);
+    tela.addEventListener('click', roleta.Girar, false);
+    roleta.Tela = tela.getContext('2d');
+  },
+
+  IniciarRoleta: function () {
+    shuffle(espectro);
+  },
+
+  atualizar: function () {
+    var r = Math.floor(Math.random() * roleta.segmentos.length);
+    roleta.anguloAtual = ((r + 0.5) / roleta.segmentos.length) * Math.PI * 2;
+
+    var segmentos = roleta.segmentos;
+    var quantidadeDeNomes = segmentos.length;
+    var tamanhoDoVetorDeCores = espectro.length;
+
+    var CacheDeCores = [];
+    
+    for (var i = 0; i < quantidadeDeNomes; i++) {
+      var cor = espectro[mod(hashCode(segmentos[i]), tamanhoDoVetorDeCores)];
+      CacheDeCores.push(cor);
+    }
+    roleta.CacheDeCores = CacheDeCores;
+    roleta.desenhar();
+  },
+
+  desenhar: function () {
+    roleta.apagar();
+    roleta.DesenharRoleta();
+    roleta.DesenharAgulha();
+  },
+
+  apagar: function () {
+    var roda = roleta.Tela;
+    roda.clearRect(0, 0, 1000, 800);
+  },
+
+  DesenharAgulha: function () {
+    var roda = roleta.Tela;
+    var centroX = roleta.centroX;
+    var centroY = roleta.centroY;
+    var tamanho = roleta.tamanho;
+
+    roda.lineWidth = 1;
+    roda.strokeStyle = '#000000';
+    roda.fileStyle = '#ffffff';
+
+    roda.beginPath();
+
+    roda.moveTo(centroX + tamanho - 40, centroY);
+    roda.lineTo(centroX + tamanho + 20, centroY - 10);
+    roda.lineTo(centroX + tamanho + 20, centroY + 10);
+    roda.closePath();
+
+    roda.stroke();
+    roda.fill();
+
+    // armazena o segmento apontado pela agulha
+    var i = roleta.segmentos.length - Math.floor((roleta.anguloAtual / (Math.PI * 2)) * roleta.segmentos.length) - 1;
+
+    // formatando o texto
+    roda.textAlign = 'left';
+    roda.textBaseline = 'middle';
+    roda.fillStyle = '#000000';
+    roda.font = '2em Arial';
+    roda.fillText(roleta.segmentos[i], centroX + tamanho + 25, centroY);
+  },
+
+  DesenharSegmento: function (chave, ultimoAngulo, angulo) {
+    var roda = roleta.Tela;
+    var centroX = roleta.centroX;
+    var centroY = roleta.centroY;
+    var tamanho = roleta.tamanho;
+    var valor = roleta.segmentos[chave];
+
+    roda.save();
+    roda.beginPath();
+
+    // iniciando no centro
+    roda.moveTo(centroX, centroY);
+    roda.arc(centroX, centroY, tamanho, ultimoAngulo, angulo, false);
+    roda.lineTo(centroX, centroY);
+    roda.clip();
+    roda.closePath();
+
+    roda.fillStyle = roleta.CacheDeCores[chave];
+    roda.fill();
+    roda.stroke();
+
+    // desenhando os nomes na tela
+    roda.save();
+    roda.translate(centroX, centroY);
+    roda.rotate((ultimoAngulo + angulo) / 2);
+
+    roda.fillStyle = '#000000';
+    roda.fillText(valor.substr(0, 20), tamanho / 2 + 20, 0);
+    roda.restore();
+
+    roda.restore();
+  },
+
+  DesenharRoleta: function () {
+    var roda = roleta.Tela;
+
+    var anguloAtual = roleta.anguloAtual;
+    var ultimoAngulo = anguloAtual;
+
+    var tamanho = roleta.segmentos.length;
+
+    var centroX = roleta.centroX;
+    var centroY = roleta.centroY;
+    var tam = roleta.tamanho;
+
+    var PI2 = Math.PI * 2;
+
+    roda.lineWidth = 1;
+    roda.strokeStyle = '#000000';
+    roda.textBaseline = 'middle';
+    roda.textAlign = 'center';
+    roda.font = '1.4em Arial';
+
+    for (var i = 1; i <= tamanho; i++) {
+      var angle = PI2 * (i / tamanho) + anguloAtual;
+      roleta.DesenharSegmento(i - 1, ultimoAngulo, angle);
+      ultimoAngulo = angle;
+    }
+    // desenha o circulo interno
+    roda.beginPath();
+    roda.arc(centroX, centroY, 20, 0, PI2, false);
+    roda.closePath();
+
+    roda.fillStyle = '#ffffff';
+    roda.strokeStyle = '#000000';
+    roda.fill();
+    roda.stroke();
+
+    // desenha o circulo externo
+    roda.beginPath();
+    roda.arc(centroX, centroY, tam, 0, PI2, false);
+    roda.closePath();
+
+    roda.lineWidth = 10;
+    roda.strokeStyle = '#000000';
+    roda.stroke();
+  }
+};
+
+var espectro = ['#e17a7a', '#e1947a', '#e1ad7a', '#e1c77a', '#e1e17a', '#c7e17a', '#ade17a', '#94e17a', '#7ae17a', '#7ae194', '#7ae1ad', '#7ae1c7', '#7ae1e1', '#7ac7e1', '#7aade1', '#7a94e1', '#7a7ae1', '#947ae1', '#ad7ae1', '#c77ae1', '#e17ae1', '#e17ac7', '#e17aad', '#e17a94', '#e17a7a'];
+    </script>    
+  </body>
+</html>
